@@ -1,0 +1,47 @@
+# ---- 本地工作区（不入库）----
+_local/
+samples/
+tools/
+attic/
+.venv/
+
+# ---- build/ 只保留 4 个构建脚本，其余为产物 ----
+build/*
+!build/build_apk.ps1
+!build/adddex.py
+!build/install_apk.ps1
+!build/mk_big.py
+
+# ---- 二进制与密钥 ----
+*.apk
+*.aab
+*.jks
+*.keystore
+*.idsig
+*.dex
+*.class
+*.so
+*.jar
+*.whl
+*.xz
+
+# ---- 日志 / 截图 / 临时文件 ----
+*.log
+*.png
+*.jpg
+*.jpeg
+*.webp
+i*.txt
+i*e.txt
+full*.txt
+log_*.txt
+inst*.txt
+_probe.txt
+android-location-detection-catalog.md
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+*.iml
+Thumbs.db
+.DS_Store

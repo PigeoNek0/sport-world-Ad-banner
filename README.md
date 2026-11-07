@@ -1,0 +1,170 @@
+# NetKit · 网络工具箱
+
+> 一个**不需要 root** 的安卓本地广告拦截器：用「本机 VPN 只做 DNS 过滤」拦截广告域名，用「无障碍服务」自动跳过开屏 / 插屏广告。
+> 全部逻辑在本机完成，没有远程服务、没有遥测、不改动任何第三方 App。
+
+```
+包名   com.zszl.netkit
+minSdk 26 (Android 8.0)   targetSdk 36 (Android 16)
+语言   Java 8，零第三方依赖，约 130 KB 代码
+许可   MIT
+```
+
+---
+
+## 它解决什么问题
+
+移动端广告有两条路可走：
+
+| 广告形态 | 拦截手段 | 本项目的做法 |
+|---|---|---|
+| 走网络的横幅 / 插屏 / 激励视频 | 在 DNS 层把广告域解析结果改成 `0.0.0.0` | **VpnService + 本地 DNS 代理**，按应用生效（per-app） |
+| 素材随业务接口下发、App 自己渲染的开屏 / 插屏 | 只能点掉 | **AccessibilityService** 按「文字 / id / 描述」规则点击，并用「坐标学习」加速同版式 |
+
+两条腿互补：DNS 拦掉大部分 SDK 请求，无障碍兜住剩下的自渲染广告。
+
+## 特性
+
+- **仅本机 VPN 做 DNS 过滤**：不转发任何流量，只劫持 53/UDP 的 DNS 请求；未命中的查询转发到国内公共 DNS（阿里 / 腾讯）。
+- **按应用生效**：只对勾选的应用启用，其他 App 完全不受影响（系统只允许一个 VPN，这是硬约束）。
+- **可插拔清单**：内置核心清单（约 30 条精选广告域）、可选大清单（32 万条，自带误伤保护，默认关闭），支持导入自定义 `.txt`、在线编辑规则。
+- **开屏自动跳过**：规则语义兼容常见做法（`|包含` / `=相等` / `+前缀` / 资源 id 后缀 / contentDescription）。
+- **坐标学习 + 人工复核**：把「点完广告真的消失」的位置记下来，跨次加速；样本默认「待复核」，需你确认才生效，可逐条启用 / 停用 / 删除。
+- **跳转判负**：点击后若真的跳到了别的 App，该样本自动停用，避免越学越歪。
+- **竖条带扫描**：同一个开屏的「跳过」会随「有无通知横幅 / 素材比例」纵向漂移，因此在锚点上下自动换点重试。
+- **零网络权限滥用**：只有 `INTERNET`（用于向 DNS 上游发查询）和 `ACCESS_NETWORK_STATE`。
+
+## 工作原理
+
+```
+                 ┌──────────────────────────────┐
+   App 的 DNS ──▶│  VpnService (tun)            │
+                 │   └─ DnsProxy: 解析 53/UDP    │
+                 │        ├─ 命中清单 → 回 0.0.0.0│
+                 │        └─ 未命中 → 转发上游    │
+                 └──────────────────────────────┘
+
+   前台窗口 ──▶ AccessibilityService (SkipService)
+                 ├─ 文本 / id / desc 规则命中 → 点击
+                 ├─ 坐标档案命中 → 点击 + 竖条带重试
+                 └─ 点击后 700ms 复核 → 成功才沉淀样本
+```
+
+坐标学习与规则的实现细节写在 [`docs/SKIP_SERVICE_NOTE.md`](docs/SKIP_SERVICE_NOTE.md)；真机实测数据在 [`docs/TEST-2026-11-03-band-scan.md`](docs/TEST-2026-11-03-band-scan.md)。
+
+## 目录结构
+
+```
+app/
+  AndroidManifest.xml
+  src/com/zszl/netkit/
+    AdVpnService.java       VpnService：建 tun、per-app 允许清单、前台通知
+    DnsProxy.java           tun 读写 + DNS 报文解析 + 伪造应答 + 异步转发
+    FilterList.java         清单装载（assets / 导入文件 / 自定义规则）+ 父域上溯匹配
+    Prefs.java              设置项
+    Stats.java              拦截计数 + Top10
+    SkipService.java        无障碍跳过：规则引擎、坐标学习、条带重试、跳转判负
+    Profiles.java           坐标档案（三态：待复核 / 生效 / 停用）+ 原子写
+    ProfilesActivity.java   复核页
+    AppPickerActivity.java  选择要净化的应用
+    MainActivity.java       设置主页
+    BootReceiver.java       开机自启
+  assets/
+    blocklist_core.txt      核心广告域（精挑，默认启用）
+    blocklist_extra.txt     统计 / 推送上报域（可选）
+    blocklist_big.txt       32 万条大清单（可选，含误伤保护）
+    skip_rules.json         开屏 / 插屏跳过规则
+  res/xml/skip_service.xml  无障碍服务声明
+build/
+  build_apk.ps1             一条命令出包（aapt2 + javac + d8 + zipalign + apksigner）
+  adddex.py                 往 APK 里追加第二个 dex
+  install_apk.ps1           安装（自动点掉 MIUI 的 USB 安装弹窗）
+  mk_big.py                 生成大清单（从上游清单裁剪 + 误伤保护）
+docs/
+  SKIP_SERVICE_NOTE.md      坐标学习 / 规则格式
+  PLAN.md                   开发计划与待办
+  TEST-2026-11-03-band-scan.md  真机实测报告
+```
+
+## 构建
+
+不使用 Gradle，直接调 Android SDK 命令行工具，方便在任意机器复现。
+
+**需要**：JDK 11+、Android SDK `build-tools`（含 `aapt2` / `d8` / `zipalign` / `apksigner`）、`platforms/android-36/android.jar`。
+
+```powershell
+# 目录约定（可用参数覆盖）
+#   tools/sdk/android-15/   build-tools 解包目录
+#   tools/sdk/android-36/   platform 解包目录（android.jar）
+
+powershell -NoProfile -ExecutionPolicy Bypass -File build\build_apk.ps1
+# 产物：build/netkit/NetKit-unsigned.apk
+```
+
+签名（自己生成密钥，不要用仓库里的测试密钥分发）：
+
+```powershell
+keytool -genkeypair -keystore my.jks -alias mykey -keyalg RSA -keysize 2048 -validity 10000
+apksigner sign --ks my.jks --ks-key-alias mykey --out NetKit.apk build/netkit/NetKit-unsigned.apk
+```
+
+安装：
+
+```powershell
+powershell -File build\install_apk.ps1 -Apk build\netkit\NetKit-signed.apk
+```
+
+## 使用
+
+1. 打开「网络工具箱」→ **开启过滤** → 允许系统 VPN 授权；
+2. **选择要净化的应用** → 勾选目标 App（默认只有一个示例）；
+3. 需要更狠就打开 **启用大清单（32 万条）**，注意可能误伤业务；
+4. 想跳过开屏就打开 **自动跳过开屏 / 插屏**，并按提示授予无障碍权限；
+5. 学习到的坐标在 **管理坐标学习（人工复核）** 里逐条核对，默认「待复核」，点「启用」才生效。
+
+> ⚠️ 每次覆盖安装 APK，系统都会清空无障碍绑定，需要重新授权一次（设置页会出现「重新授权无障碍」按钮）。
+
+## 清单与规则格式
+
+自定义清单（导入 `.txt` 或「编辑自定义规则」）支持：
+
+```
+ad.example.com                 命中该域及其子域
+0.0.0.0 ad.example.com         hosts 写法
+>ad.example.com 0.0.0.0        IP 映射写法
+```
+
+跳过规则 `app/assets/skip_rules.json`：
+
+```json
+[
+  { "id": "|跳过",              "action": "TAP_AT:0.887,0.157", "times": 3 },
+  { "id": "inter-close-button", "action": "TAP",               "times": 2 },
+  { "id": "|关闭广告",           "action": "BACK",              "times": 2 }
+]
+```
+
+`id` 语义：`|` 文本包含、`=` 文本相等、`+` 前缀、无前缀按资源 id 后缀匹配；没有 id 时按 contentDescription 匹配。
+`action`：`TAP`（点节点）、`BACK`、`TAP_AT:x,y`（0–1 相对屏幕坐标）。
+
+## 已知限制
+
+- **自渲染广告拦不掉**：素材随业务 API 下发、由 App 自己画出来的广告，DNS 层无能为力，只能靠无障碍点掉。
+- **同一时间只能一个 VPN**：与其它 VPN / 代理类 App 互斥。
+- **开屏是概率出现**：开着大清单时，多数开屏因为素材请求被拦而根本不出现——这时"没有可跳过的东西"。
+- **不同厂商版式差异大**：跳过按钮可能右上、左上、中下；本工具默认覆盖右上为主，其余靠坐标学习补。
+- **网络运营商 DNS 劫持**：部分地区明文 DNS 被劫持会返回假地址，此时过滤效果依赖清单是否覆盖到被劫持后的域名。
+
+## 隐私
+
+- 不收集、不上传任何数据；无第三方 SDK、无统计、无广告。
+- DNS 查询只在「本机 → 你配置的上游」之间传递，不经任何中转服务。
+- 无障碍服务只读取前台窗口的控件树用于匹配广告关闭按钮，不做录屏、不存文本内容。
+
+## 路线图
+
+见 [`docs/PLAN.md`](docs/PLAN.md)。近期重点：坐标档案单写者重构、跳转判负加白名单、条带下界放宽、清单加载挪出主线程。
+
+## 许可证
+
+[MIT](LICENSE)

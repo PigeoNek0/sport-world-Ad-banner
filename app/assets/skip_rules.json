@@ -1,0 +1,125 @@
+{
+  "_comment": "自动跳过规则。id 前缀语义与李跳跳一致：| 文本包含 / = 文本相等 / + 文本前缀 / 无前缀按资源 id 或 contentDescription 精确匹配。action 可取目标资源id / 文本 / GLOBAL_ACTION_BACK / TAP_BR / TAP_TR / TAP_INFO_CLOSE / AUTO_CLOSE。times 为单次运行内最多触发次数。",
+  "popup_rules": [
+    {
+      "id": "ad_close",
+      "action": "ad_close",
+      "times": 8
+    },
+    {
+      "id": "over_ad_close",
+      "action": "over_ad_close",
+      "times": 8
+    },
+    {
+      "id": "inter-close-button_closeBtn",
+      "action": "inter-close-button_closeBtn",
+      "times": 8
+    },
+    {
+      "id": "auto_call_close_button",
+      "action": "auto_call_close_button",
+      "times": 4
+    },
+    {
+      "id": "|closeBtn",
+      "action": "|closeBtn",
+      "times": 8
+    },
+    {
+      "id": "|close_button",
+      "action": "|close_button",
+      "times": 8
+    },
+    {
+      "id": "|inter-close",
+      "action": "|inter-close",
+      "times": 8
+    },
+    {
+      "id": "ksad_skip_view",
+      "action": "ksad_skip_view",
+      "times": 4
+    },
+    {
+      "id": "tt_splash_skip_btn",
+      "action": "tt_splash_skip_btn",
+      "times": 6
+    },
+    {
+      "id": "tt_splash_ad_logo",
+      "action": "tt_splash_skip_btn",
+      "times": 4
+    },
+    {
+      "id": "gdt_btn_close",
+      "action": "gdt_btn_close",
+      "times": 4
+    },
+    {
+      "id": "iv_close",
+      "action": "iv_close",
+      "times": 4
+    },
+    {
+      "id": "img_close",
+      "action": "img_close",
+      "times": 4
+    },
+    {
+      "id": "close_ad",
+      "action": "close_ad",
+      "times": 4
+    },
+    {
+      "id": "|跳过",
+      "action": "|跳过",
+      "times": 8
+    },
+    {
+      "id": "=跳过",
+      "action": "=跳过",
+      "times": 6
+    },
+    {
+      "id": "|跳过广告",
+      "action": "|跳过广告",
+      "times": 6
+    },
+    {
+      "id": "|点击跳过",
+      "action": "|点击跳过",
+      "times": 6
+    },
+    {
+      "id": "=关闭",
+      "action": "=关闭",
+      "times": 6
+    },
+    {
+      "id": "|关闭广告",
+      "action": "|关闭广告",
+      "times": 6
+    },
+    {
+      "id": "|应用名称：应用商店",
+      "action": "TAP_INFO_CLOSE",
+      "times": 3
+    },
+    {
+      "id": "ad_container",
+      "action": "AUTO_CLOSE",
+      "times": 4
+    },
+    {
+      "id": "|上滑或点击",
+      "action": "TAP_AT:0.896,0.206",
+      "times": 3
+    },
+    {
+      "id": "|下载或跳转第三方应用",
+      "action": "TAP_AT:0.896,0.206",
+      "times": 3
+    }
+  ]
+}
