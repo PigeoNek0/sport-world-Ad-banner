@@ -1,12 +1,12 @@
 param(
     [switch]$Sign,
-    [string]$Ks,           # 签名用 keystore 路径（-Sign 时必填）
-    [string]$KsAlias,      # keystore 别名（-Sign 时必填）
-    [string]$KsPass,       # keystore / key 口令（-Sign 时必填）
-    [string]$JavaHome = $env:JAVA_HOME,  # 不设则用 PATH 上的 javac/jar
-    [string]$Sdk,          # build-tools 与 android.jar 的父目录，默认 <repo>/tools/sdk
-    [string]$BuildTools = 'android-15',  # tools/sdk 下的 build-tools 子目录名
-    [string]$Platform  = 'android-36'    # tools/sdk 下含 android.jar 的子目录名
+    [string]$Ks,           # keystore path (required with -Sign)
+    [string]$KsAlias,      # keystore key alias (required with -Sign)
+    [string]$KsPass,       # keystore / key password (required with -Sign)
+    [string]$JavaHome = $env:JAVA_HOME,  # falls back to javac/jar on PATH if unset
+    [string]$Sdk,          # parent dir of build-tools and android.jar; default <repo>/tools/sdk
+    [string]$BuildTools = 'android-15',  # build-tools subdir name under tools/sdk
+    [string]$Platform  = 'android-36'    # platform subdir (android.jar) name under tools/sdk
 )
 $ErrorActionPreference = 'Stop'
 
@@ -70,7 +70,7 @@ if (-not $Sign) {
 
 Write-Host "[7/7] apksigner"
 if (-not $Ks -or -not $KsAlias -or -not $KsPass) {
-    throw "签名需要 -Ks <keystore> -KsAlias <alias> -KsPass <password>（请用你自己生成的密钥，不要使用任何仓库自带密钥）"
+    throw "Signing requires -Ks <keystore> -KsAlias <alias> -KsPass <password> (use your own generated key; do not ship any key bundled in the repo)"
 }
 $signed = Join-Path $out 'NetKit-signed.apk'
 & (Join-Path $bt 'apksigner.bat') sign --ks $Ks --ks-key-alias $KsAlias --ks-pass "pass:$KsPass" --key-pass "pass:$KsPass" --v1-signing-enabled true --v2-signing-enabled true --out $signed $al
