@@ -200,7 +200,7 @@ static final class Entry {
 ## 8. 实施步骤（P0–P14）
 
 - [x] **P0 实测口径**：8 个数字已采集并回填 §1.1 / §9（483·105·9·369 / 204·99·7·98）。
-- [ ] **P0b 构建链**：按 §6 改写 `build/build_apk.ps1`（含 `--java`、重排、版本参数化），并用一个临时 `R.color` 引用验证能编过。**独立提交**。
+- [x] **P0b 构建链**：按 §6 改写 `build/build_apk.ps1`（含 `--java`、重排、版本参数化），`build/netkit/gen/com/zszl/netkit/R.java` 已生成（含 `xml.skip_service`），APK 验签 v2+v3 通过。
 - [ ] **P1 数据采集**：后台线程一次 `getInstalledPackages(GET_PERMISSIONS | GET_SERVICES)` + 一次 `queryIntentActivities(MAIN/LAUNCHER)`；填充 §5 十字段；隐藏自身；识别 VPN 包；加载期间显示「正在读取应用列表…」。
 - [ ] **P2 视图分离**：`items` / `view` + `applyFilter()` 五步流水 + `notifyDataSetChanged()`。
 - [ ] **P3 列表复用**：`convertView` + `ViewHolder`；赋值顺序 `setOnCheckedChangeListener(null)` → `setChecked()` → 重挂；监听里从 holder 取 Entry。
@@ -211,7 +211,7 @@ static final class Entry {
 - [ ] **P8 VPN 灰显**：文字变灰、`setEnabled(false)`、行尾提示；已存 VPN 包强制取消 + Toast。
 - [ ] **P9 最近使用**：授权检测 / 对话框 / 降级 / `onResume` 复检 / 30 天窗口。
 - [ ] **P10 主题与深色**：`styles.xml` ×2、`colors.xml` ×2、清单 theme、三页取色。
-- [ ] **P11 版本号**：清单 `2 / 1.1.0` + 脚本参数化。
+- [x] **P11 版本号**：清单 `2 / 1.1.0` + 脚本参数化。
 - [ ] **P12 保存逻辑**：保留未安装包名（R15）；`changed` 用并集比较。
 - [ ] **P13 构建 + 装机**：`-Sign` 通过；`apksigner verify -v` 输出存档（不写死 v2+v3，R17）。
 - [ ] **P14 真机验证 + 文档**：跑完 §9；README 补搜索/分类/排序；本文件勾选。
