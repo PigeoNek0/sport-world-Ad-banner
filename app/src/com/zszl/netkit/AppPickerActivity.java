@@ -78,6 +78,9 @@ public class AppPickerActivity extends Activity {
     private final List<Item> all = new ArrayList<Item>();
     private final List<Item> shown = new ArrayList<Item>();
     private final Handler ui = new Handler(Looper.getMainLooper());
+    private TextView emptyView;
+    private TextView usageHint;
+    private int effSort = SORT_NAME;
 
     private EditText search;
     private Spinner catSpin;
@@ -205,12 +208,56 @@ public class AppPickerActivity extends Activity {
         loading.setPadding(pad, 0, pad, pad / 2);
         wrap.addView(loading);
 
+        // 用量权限提示（Q11=a）：选了「按最近使用」但没授权时出现，点一下跳系统设置
+        usageHint = new TextView(this);
+        usageHint.setTextSize(12);
+        usageHint.setTextColor(Ui.c(this, R.color.text_secondary));
+        usageHint.setPadding(pad, pad / 4, pad, pad / 2);
+        usageHint.setVisibility(View.GONE);
+        usageHint.setText("「按最近使用」需要『使用情况访问』权限 — 点此去授权（不授权则按安装时间排）");
+        usageHint.setOnClickListener(v -> {
+            try {
+                startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));
+            } catch (Throwable t) {
+                Toast.makeText(this, "打不开系统设置，请手动到 设置-应用-特殊权限-使用情况访问", Toast.LENGTH_LONG).show();
+            }
+        });
+        wrap.addView(usageHint);
+
         list = new ListView(this);
         list.setDividerHeight(1);
         list.setBackgroundColor(Ui.c(this, R.color.bg));
         adapter = new RowAdapter();
         list.setAdapter(adapter);
-        wrap.addView(list, new LinearLayout.LayoutParams(
+
+        emptyView = new TextView(this);
+        emptyView.setTextSize(14);
+        emptyView.setTextColor(Ui.c(this, R.color.text_secondary));
+        emptyView.setGravity(Gravity.CENTER);
+        emptyView.setPadding(pad, pad, pad, pad);
+        emptyView.setVisibility(View.GONE);
+        emptyView.setOnClickListener(v -> {
+            // 一键回到默认筛选（Q18 口径）
+            search.setText("");
+            query = "";
+            cat = CAT_ALL;
+            onlyNet = true;
+            netSw.setChecked(true);
+            sp.edit().putBoolean("net", true).apply();
+            refresh();
+        });
+
+        android.widget.FrameLayout holder = new android.widget.FrameLayout(this);
+        holder.addView(list, new android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        // 键盘弹起时屏幕中下部会被挡住，空态提示贴顶放才不会看不见
+        android.widget.FrameLayout.LayoutParams lpEmpty =
+                new android.widget.FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                        Gravity.TOP);
+        lpEmpty.topMargin = (int) (48 * d);
+        holder.addView(emptyView, lpEmpty);
+        wrap.addView(holder, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
         // inset 加在整容器上，标题才不会跑到状态栏下面
@@ -422,13 +469,14 @@ public class AppPickerActivity extends Activity {
             }
             shown.add(it);
         }
+        effSort = (sort == SORT_USAGE && !usageAllowed) ? SORT_INSTALL : sort;
         final Collator col = Collator.getInstance(Locale.CHINA);
         Collections.sort(shown, new Comparator<Item>() {
             @Override
             public int compare(Item a, Item b) {
                 if (pinSelected && a.checked != b.checked) return a.checked ? -1 : 1;
-                if (sort == SORT_INSTALL) return Long.compare(b.firstInstall, a.firstInstall);
-                if (sort == SORT_USAGE) return Long.compare(b.lastUsed, a.lastUsed);
+                if (effSort == SORT_INSTALL) return Long.compare(b.firstInstall, a.firstInstall);
+                if (effSort == SORT_USAGE) return Long.compare(b.lastUsed, a.lastUsed);
                 return col.compare(a.label, b.label);
             }
         });
@@ -450,6 +498,17 @@ public class AppPickerActivity extends Activity {
         if (hidden > 0) sb.append(" · 当前筛选隐藏了 ").append(hidden).append(" 个已选");
         sb.append(" · 显示 ").append(shown.size()).append(" 个");
         summary.setText(sb.toString());
+
+        usageHint.setVisibility((sort == SORT_USAGE && !usageAllowed) ? View.VISIBLE : View.GONE);
+
+        if (shown.isEmpty()) {
+            emptyView.setText("没有匹配的应用\n点这里清除搜索与筛选条件");
+            emptyView.setVisibility(View.VISIBLE);
+            list.setVisibility(View.GONE);
+        } else {
+            emptyView.setVisibility(View.GONE);
+            list.setVisibility(View.VISIBLE);
+        }
 
         adapter.notifyDataSetChanged();
     }
