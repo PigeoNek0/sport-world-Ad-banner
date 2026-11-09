@@ -411,6 +411,35 @@ public class AppPickerActivity extends Activity {
         }, "netkit-picker-load").start();
     }
 
+    /** 授权后回到本页：只补 lastUsed，不重建列表（保留当前勾选与筛选）。 */
+    private void reloadUsageAsync() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                Map<String, UsageStats> usage = null;
+                try {
+                    UsageStatsManager usm = (UsageStatsManager) getSystemService(Context.USAGE_STATS_SERVICE);
+                    long now = System.currentTimeMillis();
+                    usage = usm.queryAndAggregateUsageStats(now - 7L * 24 * 3600 * 1000, now);
+                } catch (Throwable ignored) {
+                }
+                final Map<String, UsageStats> u = usage;
+                ui.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (u != null) {
+                            for (Item it : all) {
+                                UsageStats s = u.get(it.pkg);
+                                it.lastUsed = s != null ? s.getLastTimeUsed() : 0L;
+                            }
+                        }
+                        refresh();
+                    }
+                });
+            }
+        }, "netkit-picker-usage").start();
+    }
+
     private Set<String> launcherPackages(PackageManager pm) {
         Set<String> out = new HashSet<String>();
         try {
@@ -619,6 +648,8 @@ public class AppPickerActivity extends Activity {
                 usageAllowed = now;
                 Toast.makeText(this, now ? "已获得用量权限，可按最近使用排序" : "没有用量权限，按最近使用排序不可用",
                         Toast.LENGTH_SHORT).show();
+                if (now) reloadUsageAsync();
+                else refresh();
             }
         }
     }
