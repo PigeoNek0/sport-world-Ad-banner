@@ -1,4 +1,4 @@
-# 应用选择页改造 · 设计计划清单（v2）
+﻿# 应用选择页改造 · 设计计划清单（v2）
 
 > 目标：把「选择要净化的应用」从一张 488 行的裸列表，改成**可搜索、可分类、可排序**的选择器，
 > 并保证三件事不出错：**勾选不丢、保存只看全量、切筛选不误判**。
@@ -31,30 +31,36 @@
 
 > 判据唯一来源：`ApplicationInfo.flags` + 一次 LAUNCHER 查询。**不含自身**（`com.zszl.netkit`）。
 
-| Spinner 项 | 判据 | 规模 |
+| Spinner 项 | 判据 | 规模（实测） |
 |---|---|---|
-| 全部 | 全部可见条目（= 不含自身） | 487（INTERNET 关时）／见 §1.1 |
-| 外部应用 | `(flags & FLAG_SYSTEM) == 0` **且** 有 LAUNCHER activity | 待 P0 实测 |
-| 系统应用 | `FLAG_SYSTEM != 0`（含 `FLAG_UPDATED_SYSTEM_APP`）**且** 有 LAUNCHER activity | 待 P0 实测 |
-| 系统组件 | 无 LAUNCHER activity | 待 P0 实测 |
+| 全部 | 全部可见条目（不含自身） | 483 |
+| 外部应用 | `(flags & FLAG_SYSTEM) == 0` **且** 有 LAUNCHER activity | 105 |
+| 系统应用 | `FLAG_SYSTEM != 0`（含 `FLAG_UPDATED_SYSTEM_APP`）**且** 有 LAUNCHER activity | 9 |
+| 系统组件 | 无 LAUNCHER activity | 369 |
+
+> 实测设备：`9f165280` / 24129PN74C / Android 16 (SDK 36)，`pm list packages` 共 484（含自身），LAUNCHER 唯一包名 115（含自身）。105 + 9 + 369 = 483 ✓
 
 - 「有 LAUNCHER activity」= 该包名出现在一次 `queryIntentActivities(ACTION_MAIN + CATEGORY_LAUNCHER)` 的结果集合里。
 - **命名提示**：这一类的准确定义是「无启动图标的包」，其中也包含无图标的**用户**应用（输入法、插件）。名称「系统组件」沿用 Q1 决策，仅在此注明确切范围。
 
-### 1.1 数量必须实测（P0 交付物）
+### 1.1 实测结果（P0 已完成）
 
-四个分类 × INTERNET 开/关 = 8 个数字，用 adb 实测后回填上表，**不预设任何数字**（尤其不能假设「系统组件 = 0」）。
+采集脚本：`build/p0_stats.py`（读 `pm list packages` / `pm list packages -s/-3` / `cmd package query-activities` / `dumpsys package` 的临时 dump，**dump 不入库**）。
 
-```sql
--- 采集口径（与 App 内一致）
-总数          = pm list packages                      minus 自身
-有 LAUNCHER   = cmd package query-activities -a android.intent.action.MAIN -c android.intent.category.LAUNCHER
-FLAG_SYSTEM   = pm list packages -s
-三方          = pm list packages -3
-有 INTERNET   = dumpsys package <pkg> | grep "android.permission.INTERNET"   （逐包或抽样）
-```
+| 分类 | INTERNET **关** | INTERNET **开** |
+|---|---|---|
+| 全部 | **483** | **204** |
+| 外部应用 | **105** | **99** |
+| 系统应用 | **9** | **7** |
+| 系统组件 | **369** | **98** |
 
-> 设备未连接时该步骤阻塞，**P0 未完成不得开始 P2 之后的实现**（否则 T1/T2 判据无意义）。
+由此确定三条事实，直接推翻 v1 的假设：
+
+1. **「INTERNET 开 → 系统组件 ≈ 0」不成立**：实测 98 个无图标包申请了 INTERNET（GMS、WebView、厂商推送/定位等）。
+2. 有图标包共 114 个（105 外部 + 9 系统）；无图标包 369 个 —— 「系统组件」是列表噪音的主要来源，默认的 INTERNET 开关把它从 369 压到 98。
+3. 默认目标「运动世界」：有 INTERNET、有 LAUNCHER、非系统 → 落在「外部应用」，**不会被默认开关隐藏**。
+
+补充：`dumpsys package` 不暴露 service 级 `permission` 属性，所以 **VPN 包识别只靠 App 内 `PackageInfo.services[].permission`**，验证放在 T14 而不是 P0。
 
 ---
 
@@ -193,7 +199,7 @@ static final class Entry {
 
 ## 8. 实施步骤（P0–P14）
 
-- [ ] **P0 实测口径**：按 §1.1 采集 8 个数字，回填 §1 表与 §9 判据。**未完成不进入 P3+**。
+- [x] **P0 实测口径**：8 个数字已采集并回填 §1.1 / §9（483·105·9·369 / 204·99·7·98）。
 - [ ] **P0b 构建链**：按 §6 改写 `build/build_apk.ps1`（含 `--java`、重排、版本参数化），并用一个临时 `R.color` 引用验证能编过。**独立提交**。
 - [ ] **P1 数据采集**：后台线程一次 `getInstalledPackages(GET_PERMISSIONS | GET_SERVICES)` + 一次 `queryIntentActivities(MAIN/LAUNCHER)`；填充 §5 十字段；隐藏自身；识别 VPN 包；加载期间显示「正在读取应用列表…」。
 - [ ] **P2 视图分离**：`items` / `view` + `applyFilter()` 五步流水 + `notifyDataSetChanged()`。
@@ -216,9 +222,9 @@ static final class Entry {
 
 | # | 用例 | 判据 |
 |---|---|---|
-| T1 | 默认进入 | 分类=全部、搜索空、INTERNET 开、置顶开、名称排序；**「全部」数量 = P0 实测的 INTERNET 开时总数** |
-| T2 | 切「系统组件」（INTERNET 开） | Spinner 数字 = P0 实测值（**不预设 0**）；列表条数与数字一致 |
-| T3 | 关 INTERNET | 「全部」= 487（不含自身）；「系统组件」= P0 实测值；出现 `com.qualcomm.qtil.*` 等 |
+| T1 | 默认进入 | 分类=全部、搜索空、INTERNET 开、置顶开、名称排序；**「全部」数量 = 204（P0 实测，INTERNET 开）** |
+| T2 | 切「系统组件」（INTERNET 开） | Spinner 数字 = **98**（P0 实测，INTERNET 开）；列表条数与数字一致 |
+| T3 | 关 INTERNET | 「全部」= **483**、「外部」= 105、「系统」= 9、「系统组件」= **369**（P0 实测）；出现 `com.qualcomm.qtil.*` 等 |
 | T4 | 搜索 `运动` / `zjwh` | 都命中运动世界 |
 | T5 | 搜索乱串 | 空态 +「清除筛选」→ 只清搜索与分类（R13） |
 | T6 | 关 INTERNET → 勾一个无网络应用 → 开 INTERNET | 该应用消失；设置行小字 `含 1 个无网络已选`；状态行 `分类隐藏` 不增加 |
