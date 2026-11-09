@@ -48,7 +48,9 @@ minSdk 26 (Android 8.0)   targetSdk 36 (Android 16)
 - **坐标学习 + 人工复核**：把「在你手机上手点确实关掉了广告」的位置记下来，下次同版式直接命中；样本默认「待复核」，需你确认才生效，可逐条启用 / 停用 / 删除。
 - **跳转判负**：点击后若真的跳到了别的 App（京东 / 淘宝 / 应用商店），该样本自动停用，避免越学越歪。
 - **竖条带扫描**：同一个开屏的「跳过」会随「有无通知横幅 / 素材比例」纵向漂移（实测同素材会从 y≈0.157 漂到 y≈0.206），因此在锚点上下自动换点重试。
-- **零网络权限滥用**：只有 `INTERNET`（用于向 DNS 上游发查询）和 `ACCESS_NETWORK_STATE`。
+- **好用的应用选择页**（1.1.0）：按名称 / 包名搜索，按「外部应用 / 系统应用 / 系统组件」分类并显示数量，可只看有网络权限的应用，支持按名称 / 安装时间 / 最近使用排序，已选的排在最前；VPN 类应用灰显、不可勾选。
+- **跟随系统深色模式**（1.1.0）。
+- **零网络权限滥用**：联网权限只有 `INTERNET`（用于向 DNS 上游发查询）和 `ACCESS_NETWORK_STATE`。
 
 ## 工作原理
 
@@ -82,8 +84,9 @@ app/
     SkipService.java        无障碍跳过：规则引擎、坐标学习、条带重试、跳转判负
     Profiles.java           坐标档案（三态：待复核 / 生效 / 停用）+ 原子写
     ProfilesActivity.java   复核页
-    AppPickerActivity.java  选择要净化的应用
+    AppPickerActivity.java  选择要净化的应用（搜索 / 分类 / 排序 / 后台加载）
     MainActivity.java       设置主页
+    Ui.java                 深浅色适配助手（状态栏、取色）
     BootReceiver.java       开机自启
   assets/
     blocklist_core.txt      核心广告域（精挑，默认启用）
@@ -91,14 +94,17 @@ app/
     blocklist_big.txt       32 万条大清单（可选，含误伤保护）
     skip_rules.json         开屏 / 插屏跳过规则
   res/xml/skip_service.xml  无障碍服务声明
+  res/values(-night)/       浅色 / 深色配色与 AppTheme
 build/
-  build_apk.ps1             一条命令出包（aapt2 + javac + d8 + zipalign + apksigner）
+  build_apk.ps1             一条命令出包（aapt2 生成 R.java → javac → d8 → zipalign → apksigner）
   adddex.py                 往 APK 里追加第二个 dex
   install_apk.ps1           安装（自动点掉 MIUI 的 USB 安装弹窗）
   mk_big.py                 生成大清单（从上游清单裁剪 + 误伤保护）
 docs/
   SKIP_SERVICE_NOTE.md      坐标学习 / 规则格式
   PLAN.md                   开发计划与待办
+  PICKER-UI-PLAN.md         选择页改造计划（1.1.0）及审查意见 PICKER-UI-PLAN-REVIEW.md
+  HANDOVER-*.md             每轮交接文档
   TEST-2026-11-03-band-scan.md  真机实测报告
 ```
 
@@ -113,16 +119,20 @@ docs/
 #   tools/sdk/android-15/   build-tools 解包目录
 #   tools/sdk/android-36/   platform 解包目录（android.jar）
 
-powershell -NoProfile -ExecutionPolicy Bypass -File build\build_apk.ps1
-# 产物：build/netkit/NetKit-unsigned.apk
+powershell -NoProfile -ExecutionPolicy Bypass -File build\build_apk.ps1 -JavaHome "<JDK 根目录>"
+# 产物（未签名）：build/netkit/aligned.apk
 ```
 
-签名（自己生成密钥，不要用仓库里的测试密钥分发）：
+签名（自己生成密钥，密钥不要入库）：
 
 ```powershell
 keytool -genkeypair -keystore my.jks -alias mykey -keyalg RSA -keysize 2048 -validity 10000
-apksigner sign --ks my.jks --ks-key-alias mykey --out NetKit.apk build/netkit/NetKit-unsigned.apk
+powershell -NoProfile -ExecutionPolicy Bypass -File build\build_apk.ps1 -JavaHome "<JDK 根目录>" `
+  -Sign -Ks my.jks -KsAlias mykey -KsPass <password>
+# 产物：build/netkit/NetKit-signed.apk
 ```
+
+版本号以 `app/AndroidManifest.xml` 的 `versionCode` / `versionName` 为准。
 
 安装：
 
@@ -133,7 +143,8 @@ powershell -File build\install_apk.ps1 -Apk build\netkit\NetKit-signed.apk
 ## 使用
 
 1. 打开「网络工具箱」→ **开启过滤** → 允许系统 VPN 授权；
-2. 目标应用**默认已经勾选运动世界**（`com.zjwh.android_wh_physicalfitness`），不用改；要加别的 App 就点「选择要净化的应用」；
+2. 目标应用**默认已经勾选运动世界**（`com.zjwh.android_wh_physicalfitness`），不用改；要加别的 App 就点「选择要净化的应用」，可以搜索名称或包名、按分类筛选、切换排序；返回即生效（过滤运行中会原地重建，不需要手动重开）；
+   「按最近使用」排序需要在系统设置里授予「使用情况访问权限」，未授权时自动改按安装时间排序；
 3. 需要更狠就打开 **启用大清单（32 万条）**，注意可能误伤业务；
 4. 想跳过开屏就打开 **自动跳过开屏 / 插屏**，并按提示授予无障碍权限；
 5. 学习到的坐标在 **管理坐标学习（人工复核）** 里逐条核对，默认「待复核」，点「启用」才生效。
@@ -186,6 +197,8 @@ ad.example.com                 命中该域及其子域
 - 不收集、不上传任何数据；无第三方 SDK、无统计、无广告。
 - DNS 查询只在「本机 → 你配置的上游」之间传递，不经任何中转服务。
 - 无障碍服务只读取前台窗口的控件树用于匹配广告关闭按钮，不做录屏、不存文本内容。
+- 「使用情况访问权限」（可选，需手动授予）只用于在选择页本机按最近使用排序，不保存、不上传。
+- 读取已安装应用列表（`QUERY_ALL_PACKAGES`）只用于选择页展示与分类。
 
 ## 路线图
 
