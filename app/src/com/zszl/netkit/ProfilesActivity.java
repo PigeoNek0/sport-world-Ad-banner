@@ -1,7 +1,6 @@
 package com.zszl.netkit;
 
 import android.app.Activity;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
@@ -48,11 +47,7 @@ public class ProfilesActivity extends Activity {
     /** 让内容避开状态栏：Android 15+ 默认边到边绘制，不处理 inset 会把标题压到状态栏下面。 */
     /** 浅色界面下把状态栏图标改成深色，否则白色图标看不见。 */
     private void lightStatusBar() {
-        try {
-            getWindow().getDecorView().setSystemUiVisibility(android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-            getWindow().setStatusBarColor(0xFFF2F2F2);
-        } catch (Throwable ignored) {
-        }
+        Ui.applyStatusBar(this);
     }
 
     private void applyTopInset(final android.view.View scroller, final android.view.View content, final int basePad) {
@@ -73,14 +68,14 @@ public class ProfilesActivity extends Activity {
         TextView title = new TextView(this);
         title.setText("坐标学习档案");
         title.setTextSize(22);
-        title.setTextColor(Color.BLACK);
+        title.setTextColor(Ui.c(this, R.color.text_primary));
         box.addView(title);
 
         TextView hint = new TextView(this);
         hint.setText("只记录「自己点完广告真的消失」的样本。默认待复核，需要你确认后才会自动套用；"
                 + "若某次点击导致跳到别的 App，该样本会被自动停用。");
         hint.setTextSize(13);
-        hint.setTextColor(Color.DKGRAY);
+        hint.setTextColor(Ui.c(this, R.color.text_secondary));
         hint.setPadding(0, 8, 0, 16);
         box.addView(hint);
 
@@ -100,13 +95,13 @@ public class ProfilesActivity extends Activity {
             TextView name = new TextView(this);
             name.setText(it.sig);
             name.setTextSize(15);
-            name.setTextColor(Color.BLACK);
+            name.setTextColor(Ui.c(this, R.color.text_primary));
             row.addView(name);
 
             TextView meta = new TextView(this);
             meta.setText(it.label());
             meta.setTextSize(12);
-            meta.setTextColor("off".equals(it.state) ? Color.RED : Color.DKGRAY);
+            meta.setTextColor(Ui.c(this, "off".equals(it.state) ? R.color.text_disabled : R.color.text_secondary));
             row.addView(meta);
 
             LinearLayout btns = new LinearLayout(this);

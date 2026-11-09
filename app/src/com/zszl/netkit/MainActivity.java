@@ -89,11 +89,7 @@ public class MainActivity extends Activity {
     /** 让内容避开状态栏：Android 15+ 默认边到边绘制，不处理 inset 会把标题压到状态栏下面。 */
     /** 浅色界面下把状态栏图标改成深色，否则白色图标看不见。 */
     private void lightStatusBar() {
-        try {
-            getWindow().getDecorView().setSystemUiVisibility(android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-            getWindow().setStatusBarColor(0xFFF2F2F2);
-        } catch (Throwable ignored) {
-        }
+        Ui.applyStatusBar(this);
     }
 
     private void applyTopInset(final android.view.View scroller, final android.view.View content, final int basePad) {

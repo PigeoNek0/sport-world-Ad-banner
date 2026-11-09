@@ -51,11 +51,7 @@ public class AppPickerActivity extends Activity {
             }
         });
 
-        try {
-            getWindow().getDecorView().setSystemUiVisibility(android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-            getWindow().setStatusBarColor(0xFFF2F2F2);
-        } catch (Throwable ignored) {
-        }
+        Ui.applyStatusBar(this);
         final ListView lv = new ListView(this);
         final int basePad = (int) (8 * getResources().getDisplayMetrics().density);
         lv.setClipToPadding(false);

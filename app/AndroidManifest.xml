@@ -13,7 +13,7 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
-        android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
+        android:theme="@style/AppTheme"
         android:allowBackup="false"
         android:label="网络工具箱"
         android:supportsRtl="true">
